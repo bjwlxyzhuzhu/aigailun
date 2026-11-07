@@ -42,6 +42,7 @@ export function mountShelf(host, opts) {
   <button class="s-arrow l" aria-label="上一个"><svg viewBox="0 0 18 10"><path d="M5 1 L1 5 L5 9 M1 5 H17"/></svg></button>
   <button class="s-arrow r" aria-label="下一个"><svg viewBox="0 0 18 10"><path d="M13 1 L17 5 L13 9 M17 5 H1"/></svg></button>
   <div class="s-hint lbl">拖动 · 滚轮 · ← → 切换　点击封面打开</div>
+  <a class="s-qr" href="https://aigailun.app.tokenone.work" target="_blank" rel="noopener" aria-label="扫码访问本平台"><img src="/assets/qr.svg" width="72" height="72" alt="平台地址二维码"><span class="lbl">扫码访问</span></a>
   <footer class="s-foot"><span class="lbl">© 《人工智能概论》智能练考平台</span><span class="lbl"><a href="#/scope">复习范围</a> / <a href="#/papers">我的试卷</a> / <a href="#/exams">班级考试${exams ? ` (${exams})` : ''}</a></span></footer>
   <div class="s-cursor" aria-hidden="true"><div class="ring"></div><div class="dot"></div><div class="txt">OPEN<br>打开</div></div>
   <div class="s-detail" role="dialog" aria-modal="true" aria-label="详情">
