@@ -145,6 +145,14 @@ try {
   const cls0 = (await api('GET', '/api/teacher/classes', null, tch)).j[0];
   ok((await api('POST', `/api/teacher/classes/${cls0.id}/reset-passwords`, {}, tch)).j.count > 0, '教师可重置班级学生密码');
   ok(!!(await login('2026100101', '100101')), '重置后学生可用学号后 6 位登录');
+  const roster = (await api('GET', `/api/teacher/classes/${cls0.id}/students`, null, tch)).j;
+  const target = roster.find((r) => r.student_no === '2026100102') || roster[1];
+  ok((await api('POST', `/api/teacher/students/${target.id}/reset-password`, {}, tch)).s === 200, '教师重置指定学生密码');
+  ok((await api('PATCH', `/api/teacher/students/${target.id}`, { name: '改名测试', major: '智能制造', grade: '2026', student_no: '2026109999' }, tch)).s === 200, '教师修改学生信息');
+  const det = (await api('GET', `/api/teacher/students/${target.id}`, null, tch)).j.student;
+  ok(det.name === '改名测试' && det.major === '智能制造' && det.student_no === '2026109999', '修改后信息生效');
+  ok(!!(await login('2026109999', '109999').catch(() => null)) || (await api('POST', '/api/auth/login', { username: '2026109999', password: '100102' })).s === 200, '改学号后以新学号登录');
+  ok((await api('PATCH', `/api/teacher/students/${target.id}`, { student_no: '2026100101' }, tch)).s === 400, '学号重复被拒');
 
 
   console.log('# 题库');

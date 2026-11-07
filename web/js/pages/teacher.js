@@ -64,6 +64,19 @@ export async function classPage(id, query, ctx) {
   draw(); barGrow(main);
 }
 
+async function editStudent(st, parent) {
+  const cls = await GET('/teacher/classes');
+  const f = (label, v, ph = '') => { const i = h('input', { class: 'in', value: v || '', placeholder: ph }); return [i, h('div', { class: 'field' }, h('label', { class: 'f' }, label), i)]; };
+  const [no, noF] = f('学号（即登录账号）', st.student_no), [nm, nmF] = f('姓名', st.name), [co, coF] = f('学院', st.college), [mj, mjF] = f('专业', st.major), [gr, grF] = f('年级', st.grade, '如 2026');
+  const cl = h('select', { class: 'in' }, cls.map((c) => h('option', { value: c.id, selected: c.id === st.class_id }, c.name)));
+  const stt = h('select', { class: 'in' }, [['active', '正常'], ['disabled', '停用（不能登录）']].map(([v, l]) => h('option', { value: v, selected: v === st.status }, l)));
+  const m = modal(h('div', {}, h('h2', {}, '修改学生信息'), noF, nmF, coF, mjF, grF, h('div', { class: 'field' }, h('label', { class: 'f' }, '班级'), cl), h('div', { class: 'field' }, h('label', { class: 'f' }, '状态'), stt),
+    h('p', { class: 'hint' }, '修改学号会同时改变该学生的登录账号；密码、学习记录不受影响。'),
+    h('div', { class: 'row' }, h('button', { class: 'btn pri', onclick: async () => {
+      try { await PATCH(`/teacher/students/${st.id}`, { student_no: no.value, name: nm.value, college: co.value, major: mj.value, grade: gr.value, class_id: +cl.value, status: stt.value }); toast('已保存'); m.close(); parent?.close?.(); location.reload(); } catch (e) { fail(e); }
+    } }, '保存'), h('button', { class: 'btn', onclick: () => m.close() }, '取消'))));
+}
+
 async function studentModal(uid) {
   try {
     const d = await GET(`/teacher/students/${uid}`);
@@ -74,7 +87,7 @@ async function studentModal(uid) {
         h('div', {}, h('h3', { class: 'lbl' }, 'AI 用量'), h('p', { class: 'cn' }, `${d.ai.n} 次 · ${d.ai.tokens} tokens · ${yuan(d.ai.cost)}`), h('h3', { class: 'lbl', style: 'margin-top:16px' }, '高频错题'), d.wrong.length ? d.wrong.slice(0, 6).map((w) => h('p', { class: 'cn', style: 'font-size:13px;margin:4px 0' }, `[第${w.chapter_id}章·错${w.wrong_count}次] ${w.stem.slice(0, 40)}`)) : h('p', { class: 'hint' }, '暂无'))),
       h('h3', { class: 'lbl', style: 'margin-top:18px' }, '作答记录'),
       d.attempts.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('tbody', {}, d.attempts.slice(0, 12).map((a) => h('tr', {}, h('td', { class: 'cn' }, a.title), h('td', {}, kind[a.kind] || a.kind), h('td', {}, a.status === 'submitted' ? a.total_score + ' 分' : '进行中'), h('td', {}, fmtDate(a.started_at)), h('td', {}, a.kind !== 'practice' && a.status === 'submitted' ? h('button', { class: 'btn sm', onclick: () => attemptModal(a.id) }, '查看') : null)))))) : h('p', { class: 'hint' }, '暂无'),
-      h('div', { class: 'row', style: 'margin-top:18px' }, h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('重置密码', `将 ${d.student.name} 的密码重置为学号后 6 位？`, { ok: '重置', danger: true })) { try { const r = await POST(`/teacher/students/${uid}/reset-password`); toast(r.hint); } catch (e) { fail(e); } } } }, '重置密码'))), { wide: true });
+      h('div', { class: 'row', style: 'margin-top:18px' }, h('button', { class: 'btn', onclick: () => editStudent(d.student, m) }, '修改学生信息'), h('button', { class: 'btn danger', onclick: async () => { if (await confirmBox('重置密码', `将 ${d.student.name} 的密码重置为学号后 6 位（学生下次登录需修改）？`, { ok: '重置', danger: true })) { try { const r = await POST(`/teacher/students/${uid}/reset-password`); toast(r.hint); } catch (e) { fail(e); } } } }, '重置密码'))), { wide: true });
     barGrow(m.box);
   } catch (e) { fail(e); }
 }

@@ -167,7 +167,7 @@ get('/api/teacher/students/:id', TCH, ({ user, params }) => {
   const wrong = q.all(`SELECT w.wrong_count, qu.id, qu.stem, qu.chapter_id FROM wrong_book w JOIN questions qu ON qu.id=w.question_id WHERE w.user_id=? AND w.mastered=0 ORDER BY w.wrong_count DESC LIMIT 20`, s.id);
   const ai = q.get('SELECT COALESCE(SUM(input_tokens+output_tokens),0) tokens, COALESCE(SUM(actual_cost),0) cost, COUNT(*) n FROM ai_usage WHERE user_id=?', s.id);
   const cls = q.get('SELECT name FROM classes WHERE id=?', s.class_id);
-  return { student: { id: s.id, name: s.name, student_no: s.username, class_name: cls?.name, major: s.major, last_login: s.last_login }, chapters, attempts, wrong, ai };
+  return { student: { id: s.id, name: s.name, student_no: s.username, class_id: s.class_id, class_name: cls?.name, college: s.college, major: s.major, grade: s.grade, status: s.status, last_login: s.last_login }, chapters, attempts, wrong, ai };
 });
 post('/api/teacher/students/:id/reset-password', TCH, async ({ user, params, ip }) => {
   const s = ownStudent(user, +params.id);
@@ -185,11 +185,23 @@ post('/api/teacher/classes/:id/reset-passwords', TCH, async ({ user, params, ip 
   audit(user.id, 'reset_password_class', params.id, ip);
   return { ok: true, count: rows.length };
 });
-patch('/api/teacher/students/:id', TCH, ({ user, params, body }) => {
+patch('/api/teacher/students/:id', TCH, ({ user, params, body, ip }) => {
   const s = ownStudent(user, +params.id);
-  if (body.name) q.run('UPDATE users SET name=? WHERE id=?', String(body.name).trim(), s.id);
-  if (body.status) q.run('UPDATE users SET status=? WHERE id=?', body.status === 'disabled' ? 'disabled' : 'active', s.id);
-  if (body.class_id) { ownClass(user, +body.class_id); q.run('UPDATE students SET class_id=? WHERE user_id=?', +body.class_id, s.id); }
+  const txt = (v, max = 60) => String(v ?? '').trim().slice(0, max);
+  tx(() => {
+    if (body.student_no !== undefined && txt(body.student_no) !== s.username) { // the student number is the login name
+      const no = txt(body.student_no, 30);
+      if (!/^[A-Za-z0-9_-]{4,30}$/.test(no)) throw bad('学号需为 4–30 位字母或数字');
+      if (q.get('SELECT 1 x FROM users WHERE username=? AND id<>?', no, s.id)) throw bad('该学号已被使用');
+      q.run('UPDATE users SET username=? WHERE id=?', no, s.id);
+      q.run('UPDATE students SET student_no=? WHERE user_id=?', no, s.id);
+    }
+    if (body.name !== undefined) { if (!txt(body.name)) throw bad('姓名不能为空'); q.run('UPDATE users SET name=? WHERE id=?', txt(body.name), s.id); }
+    if (body.status) q.run('UPDATE users SET status=? WHERE id=?', body.status === 'disabled' ? 'disabled' : 'active', s.id);
+    if (body.class_id) { ownClass(user, +body.class_id); q.run('UPDATE students SET class_id=? WHERE user_id=?', +body.class_id, s.id); }
+    for (const k of ['college', 'major', 'grade']) if (body[k] !== undefined) q.run(`UPDATE students SET ${k}=? WHERE user_id=?`, txt(body[k]), s.id);
+  });
+  audit(user.id, 'edit_student', s.username, ip);
   return { ok: true };
 });
 put('/api/teacher/classes/:id/key', TCH, ({ user, params, body }) => { ownClass(user, +params.id); return keyOut(saveKey('class', +params.id, { ...body, ack: true }, user.id)); });
