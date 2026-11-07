@@ -127,23 +127,25 @@ try {
   ok(rep2.attempt.subjective_score > 0 && rep2.attempt.total_score === rep2.attempt.objective_score + rep2.attempt.subjective_score, `总分 = 客观 + 主观 (${rep2.attempt.total_score})`);
   ok(rep2.questions.some((q) => q.type === 'essay' && q.ai_score != null), '主观题分数写入答卷');
 
-  console.log('# 班级模拟考试');
-  const now = Date.now();
-  const ce = await api('POST', '/api/teacher/exams', { title: '考前演练', class_ids: classes.map((c) => c.id), start_at: now - 60000, end_at: now + 3600000, paper_policy: 'unified' }, tch);
-  ok(ce.s === 200, '发布班级考试');
-  ok((await api('GET', '/api/exams', null, stu)).j.length === 1, '学生可见考试');
-  const ea = await api('POST', '/api/attempts', { exam_id: ce.j.id }, stu);
-  ok(ea.s === 200, '进入考试');
-  ok((await api('POST', '/api/attempts', { exam_id: ce.j.id }, stu)).j.attempt_id === ea.j.attempt_id, '重复进入续答同一份');
-  await api('POST', `/api/attempts/${ea.j.attempt_id}/submit`, { answers: {} }, stu);
-  await new Promise((r) => setTimeout(r, 1200));
-  const es = (await api('GET', `/api/teacher/exams/${ce.j.id}/stats`, null, tch)).j;
-  ok(es.done === 1 && es.total === 16, `考试统计 参加${es.entered}/交卷${es.done}/共${es.total}`);
-  const csvOut = await api('GET', `/api/teacher/exams/${ce.j.id}/export`, null, tch);
-  ok(typeof csvOut.j === 'string' || csvOut.s === 200, '成绩导出');
-  const ts = (await api('GET', `/api/teacher/classes/${classes[0].id}/students`, null, tch)).j;
-  ok(ts.some((s) => s.answered > 0), '教师可见学生练习量');
-  ok((await api('GET', '/api/teacher/classes', null, stu)).s === 403, '学生无法访问教师接口');
+  console.log('# 模拟考试由学生自行设置 / 密码规则 / 密钥');
+  ok(t.j.initial_password === '123456', '教师默认密码为 123456');
+  ok((await api('POST', '/api/teacher/exams', { title: 'x', class_ids: [1], start_at: 1, end_at: 2 }, tch)).s === 410, '后台不再发布班级考试');
+  const g45 = await api('POST', '/api/papers/generate', { mode: 'standard', duration_min: 45 }, stu);
+  ok(g45.j.duration_min === 45, '学生自选考试时长 45 分钟');
+  const a45 = await api('POST', '/api/attempts', { paper_id: g45.j.paper_id }, stu);
+  const v45 = (await api('GET', `/api/attempts/${a45.j.attempt_id}`, null, stu)).j;
+  ok(Math.abs((v45.attempt.deadline_at - v45.attempt.started_at) - 45 * 60000) < 2000, '截止时间按所选时长计算');
+  ok((await api('GET', '/api/admin/global-key', null, adm)).s === 404, '管理员不再设置全局 Key');
+  const prov = (await api('GET', '/api/me/api-key', null, stu)).j.providers.find((x) => x.id === 'tokenone');
+  ok(prov.base === 'https://token.agentone.work/v1' && prov.models.includes('deepseek-v4.1-flash'), '中转站默认地址与模型');
+  ok(!prov.models.some((m) => /flash-p/.test(m)), '不提供越狱类模型');
+  const kbRows = (await api('GET', '/api/admin/kb', null, adm)).j;
+  ok(kbRows.find((c) => c.id === 8).chunks > 60 + 50, '知识库含第9章 WorkBuddy 新内容');
+  ok(kbRows.reduce((s, c) => s + c.chunks, 0) > 811 + 599, '知识库含课后习题');
+  const cls0 = (await api('GET', '/api/teacher/classes', null, tch)).j[0];
+  ok((await api('POST', `/api/teacher/classes/${cls0.id}/reset-passwords`, {}, tch)).j.count > 0, '教师可重置班级学生密码');
+  ok(!!(await login('2026100101', '100101')), '重置后学生可用学号后 6 位登录');
+
 
   console.log('# 题库');
   const qs = (await api('GET', '/api/questions?type=essay&size=100', null, tch)).j;

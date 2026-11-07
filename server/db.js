@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY, user_id INTEGER, ques
 CREATE TABLE IF NOT EXISTS import_issues(id INTEGER PRIMARY KEY, chapter_id INTEGER, sec TEXT, no INTEGER, raw TEXT, created_at INTEGER);
 `);
 
+try { db.exec("ALTER TABLE kb_chunks ADD COLUMN src TEXT DEFAULT 'slide'"); } catch { /* already exists */ }
+
 // Prepared statements are cached by SQL text (parsing/planning on every request was a visible cost under load).
 // Dynamic SQL with variable IN (...) lists is bounded by the cap below.
 const stmts = new Map();

@@ -216,6 +216,7 @@ get('/api/teacher/question-stats', TCH, ({ user, query }) => {
 
 /* ---------- exams ---------- */
 post('/api/teacher/exams', TCH, ({ user, body, ip }) => {
+  throw new HttpError(410, '模拟考试由学生自行设置，后台不再发布班级考试');
   const classIds = (body.class_ids || []).map(Number);
   if (!classIds.length) throw bad('请选择班级');
   classIds.forEach((id) => ownClass(user, id));

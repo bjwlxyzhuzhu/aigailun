@@ -1,12 +1,10 @@
-import crypto from 'node:crypto';
 import { q, tx, P, J, getSetting, setSetting, audit } from './db.js';
 import { get, post, put, patch, del, bad, notFound } from './http.js';
 import { hashPassword, pptxSlides } from './lib.js';
-import { saveKey, keyOut } from './student.js';
-import * as AI from './ai.js';
 
 const ADM = ['admin'];
-const SETTINGS = { final_exam_date: 'string', allow_global_key_for_students: 'bool', global_daily_limit_cny: 'number', default_password_digits: 'number', college_default: 'string', semester: 'string', ai_concurrency: 'number', rewrite_enabled: 'bool' };
+const TEACHER_DEFAULT_PW = '123456';
+const SETTINGS = { final_exam_date: 'string', default_password_digits: 'number', college_default: 'string', semester: 'string', ai_concurrency: 'number', rewrite_enabled: 'bool' };
 
 /* ---------- teachers ---------- */
 get('/api/admin/teachers', ADM, () => q.all(`SELECT u.id,u.username,u.name,u.status,u.last_login,
@@ -15,7 +13,7 @@ post('/api/admin/teachers', ADM, ({ user, body, ip }) => {
   const username = String(body.username || '').trim(), name = String(body.name || '').trim();
   if (!username || !name) throw bad('请填写工号和姓名');
   if (q.get('SELECT 1 x FROM users WHERE username=?', username)) throw bad('该工号已存在');
-  const pw = String(body.password || '') || crypto.randomBytes(5).toString('hex') + 'A1';
+  const pw = TEACHER_DEFAULT_PW; // fixed default; teacher must change it at first login
   q.run('INSERT INTO users(role,username,name,password_hash,must_change_pwd,created_at) VALUES(?,?,?,?,1,?)', 'teacher', username, name, hashPassword(pw), Date.now());
   audit(user.id, 'create_teacher', username, ip);
   return { ok: true, initial_password: pw };
@@ -26,20 +24,12 @@ patch('/api/admin/teachers/:id', ADM, ({ user, params, body, ip }) => {
   if (body.status) q.run('UPDATE users SET status=? WHERE id=?', body.status === 'disabled' ? 'disabled' : 'active', t.id);
   if (body.name) q.run('UPDATE users SET name=? WHERE id=?', String(body.name), t.id);
   let pw = null;
-  if (body.reset) { pw = crypto.randomBytes(5).toString('hex') + 'A1'; q.run('UPDATE users SET password_hash=?, must_change_pwd=1, fail_count=0, locked_until=0 WHERE id=?', hashPassword(pw), t.id); }
+  if (body.reset) { pw = TEACHER_DEFAULT_PW; q.run('UPDATE users SET password_hash=?, must_change_pwd=1, fail_count=0, locked_until=0 WHERE id=?', hashPassword(pw), t.id); }
   audit(user.id, 'edit_teacher', t.username, ip);
   return { ok: true, initial_password: pw };
 });
 
-/* ---------- global key, settings, prices ---------- */
-get('/api/admin/global-key', ADM, () => ({ key: keyOut(q.get("SELECT * FROM api_keys WHERE scope='global'")) }));
-put('/api/admin/global-key', ADM, ({ user, body }) => keyOut(saveKey('global', 0, { ...body, ack: true }, user.id)));
-del('/api/admin/global-key', ADM, ({ user }) => { q.run("DELETE FROM api_keys WHERE scope='global'"); audit(user.id, 'delete_key', 'global'); return { ok: true }; });
-post('/api/admin/global-key/test', ADM, async ({ body }) => {
-  let k = q.get("SELECT * FROM api_keys WHERE scope='global'");
-  if (!k) throw bad('请先保存全局 Key');
-  try { return await AI.testKey(k); } catch (e) { throw Object.assign(bad(e.message), { code: e.code }); }
-});
+/* ---------- settings, prices (the admin no longer manages API keys; students bring their own) ---------- */
 get('/api/admin/settings', ADM, () => Object.fromEntries(Object.keys(SETTINGS).map((k) => [k, getSetting(k, SETTINGS[k] === 'bool' ? false : SETTINGS[k] === 'number' ? 0 : '')])));
 put('/api/admin/settings', ADM, ({ user, body }) => {
   for (const [k, t] of Object.entries(SETTINGS)) if (k in body) setSetting(k, t === 'bool' ? !!body[k] : t === 'number' ? +body[k] || 0 : String(body[k] ?? ''));
@@ -65,7 +55,7 @@ post('/api/admin/kb/import', ADM, ({ user, body, ip }) => {
   let slides;
   try { slides = pptxSlides(Buffer.from(body.data, 'base64')); } catch (e) { throw bad('无法解析该 PPTX：' + e.message); }
   tx(() => {
-    q.run('DELETE FROM kb_chunks WHERE chapter_id=?', ch);
+    q.run("DELETE FROM kb_chunks WHERE chapter_id=? AND src='slide'", ch);
     slides.forEach((t, i) => { if (t.length > 8) q.run('INSERT INTO kb_chunks(chapter_id,slide_no,text) VALUES(?,?,?)', ch, i + 1, t.slice(0, 1500)); });
   });
   audit(user.id, 'kb_import', `${ch}:${slides.length}`, ip);

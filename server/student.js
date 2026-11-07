@@ -219,7 +219,7 @@ get('/api/shelf', ALL, ({ user }) => {
   });
   const wrongAll = Object.values(p.wrong).reduce((a, b) => a + b, 0);
   const mock = q.get("SELECT COUNT(*) n, MAX(total_score) best FROM attempts WHERE user_id=? AND kind!='practice' AND status='submitted'", user.id);
-  tapes.push({ id: 12, kind: 'mock', title: '模拟考试', en: 'MOCK EXAM', label: '备考', module: 'exam', ...art(11), summary: '与期末笔试同结构：50 单选 + 10 填空 + 10 判断 + 3 综合分析，100 分、90 分钟。', points: ['一键标准卷', '自定义组卷', '班级模拟考试', '成绩报告与打印'], total: 73, done: mock.n, acc: mock.best == null ? null : Math.round(mock.best), wrong: 0 });
+  tapes.push({ id: 12, kind: 'mock', title: '模拟考试', en: 'MOCK EXAM', label: '备考', module: 'exam', ...art(11), summary: '与期末笔试同结构：50 单选 + 10 填空 + 10 判断 + 3 综合分析，100 分，时长可自选（默认 90 分钟）。', points: ['一键标准卷', '自定义组卷与时长', '自己设置考试模式', '成绩报告与打印'], total: 73, done: mock.n, acc: mock.best == null ? null : Math.round(mock.best), wrong: 0 });
   tapes.push({ id: 13, kind: 'wrong', title: '我的错题本', en: 'ERROR BOOK', label: '备考', module: 'exam', ...art(12), summary: '练习与模拟考试中答错的题自动收录，连续答对 2 次视为掌握。', points: ['按章节/题型筛选', '错题重练', '错题组卷', '导出打印'], total: wrongAll, done: 0, acc: null, wrong: wrongAll });
   const exams = examsFor(user);
   return { tapes, modules: MODULES, exams: exams.filter((e) => e.state === 'open').length, final_exam_date: getSetting('final_exam_date', '') };
@@ -307,11 +307,12 @@ post('/api/practice/:id/finish', STU, ({ params, user }) => {
 /* ---------- papers & exams ---------- */
 post('/api/papers/generate', STU, ({ user, body }) => {
   try {
-    const cfg = body.mode === 'custom' ? { mode: 'custom', chapters: body.chapters || [], counts: body.counts || {}, prefer: body.prefer || null } : { mode: 'standard' };
+    const duration_min = Math.max(10, Math.min(180, Math.round(+body.duration_min) || 90)); // chosen by the student
+    const cfg = body.mode === 'custom' ? { mode: 'custom', chapters: body.chapters || [], counts: body.counts || {}, prefer: body.prefer || null, duration_min } : { mode: 'standard', duration_min };
     const comp = composePaper(user.id, cfg);
     const title = `${cfg.mode === 'standard' ? '标准模拟卷' : '自定义卷'} · ${stamp()}`;
     const id = newPaper(user.id, cfg.mode === 'standard' ? 'mock' : 'custom', title, comp, cfg);
-    return { paper_id: id, title, total: comp.total, summary: comp.summary, chapter_dist: comp.chapterDist, count: comp.ids.length };
+    return { paper_id: id, title, duration_min, total: comp.total, summary: comp.summary, chapter_dist: comp.chapterDist, count: comp.ids.length };
   } catch (e) { if (e instanceof ComposeError) throw bad(e.message); throw e; }
 });
 get('/api/papers', STU, ({ user }) => q.all(`SELECT p.id,p.title,p.kind,p.total_score,p.created_at,p.question_ids,
@@ -368,6 +369,7 @@ post('/api/attempts', STU, ({ user, body }) => {
   } else {
     paper = q.get('SELECT * FROM papers WHERE id=? AND owner_id=?', body.paper_id, user.id);
     if (!paper) throw notFound('试卷不存在');
+    limit = (P(paper.config, {}).duration_min || 90) * 60000;
     const doing = q.get("SELECT * FROM attempts WHERE user_id=? AND paper_id=? AND status='doing'", user.id, paper.id);
     if (doing) { expireIfNeeded(doing); if (q.get('SELECT status FROM attempts WHERE id=?', doing.id).status === 'doing') return { attempt_id: doing.id }; }
   }

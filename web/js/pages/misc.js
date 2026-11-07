@@ -54,11 +54,11 @@ export async function mePage(query, ctx) {
   function paintFields() {
     const P = ak.providers.find((p) => p.id === provider);
     baseI = h('input', { class: 'in', value: cur?.provider === provider ? cur.base_url : P.base, placeholder: 'https://…/v1' });
-    modelI = P.models.length ? h('select', { class: 'in' }, P.models.map((m) => h('option', { value: m, selected: cur?.model === m }, m))) : h('input', { class: 'in', value: cur?.provider === provider ? cur.model : '', placeholder: '模型名（待确认，见中转站说明）' });
+    modelI = P.models.length ? h('select', { class: 'in' }, P.models.map((m) => h('option', { value: m, selected: cur?.model === m }, m))) : h('input', { class: 'in', value: cur?.provider === provider ? cur.model : '', placeholder: '模型名' });
     keyI = h('input', { class: 'in', type: 'password', autocomplete: 'off', placeholder: cur && cur.provider === provider ? `已保存 ${cur.masked}（留空则不修改）` : 'sk-…' });
     fields.replaceChildren(
       provider === 'mock' ? h('p', { class: 'hint' }, '演示模式不联网、不花钱，返回模拟结果，用于体验 AI 批改与讲解的流程。') : null,
-      provider === 'tokenone' ? h('div', { class: 'field' }, h('label', { class: 'f' }, '接口地址（Base URL）'), baseI, h('p', { class: 'hint' }, '按 OpenAI 兼容协议调用，路径为 {Base URL}/chat/completions。')) : null,
+      provider === 'tokenone' ? h('div', { class: 'field' }, h('label', { class: 'f' }, '接口地址（Base URL）'), baseI, h('p', { class: 'hint' }, '按 OpenAI 兼容协议调用，路径为 {Base URL}/chat/completions。中转站默认地址 https://token.agentone.work/v1，Key 请在中转站个人中心创建；可选模型：deepseek-v4.1-flash（推荐）、deepseek-chat。')) : null,
       provider !== 'mock' ? h('div', { class: 'field' }, h('label', { class: 'f' }, '模型'), modelI) : null,
       provider !== 'mock' ? h('div', { class: 'field' }, h('label', { class: 'f' }, 'API Key'), keyI, h('p', { class: 'hint' }, 'Key 只在服务器端使用并加密保存，页面只显示 sk-****后四位；所有调用由后端代理，浏览器不直连模型。')) : null);
   }
@@ -72,7 +72,7 @@ export async function mePage(query, ctx) {
   const save = h('button', { class: 'btn pri', type: 'button', onclick: async () => {
     try { await PUT('/me/api-key', body()); resetAiStatus(); toast('已保存，AI 功能已解锁'); mePage(query, ctx); } catch (e) { fail(e); }
   } }, '保存');
-  const del = cur ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { if (await confirmBox('删除个人 Key', '删除后 AI 功能将不可用（除非有班级/公共 Key）。', { danger: true, ok: '删除' })) { await DEL('/me/api-key'); resetAiStatus(); toast('已删除'); mePage(query, ctx); } } }, '删除我的 Key') : null;
+  const del = cur ? h('button', { class: 'btn danger', type: 'button', onclick: async () => { if (await confirmBox('删除个人 Key', '删除后 AI 功能将不可用（除非教师设置了班级 Key）。', { danger: true, ok: '删除' })) { await DEL('/me/api-key'); resetAiStatus(); toast('已删除'); mePage(query, ctx); } } }, '删除我的 Key') : null;
   const ai = h('div', { class: 'card' }, h('h3', {}, 'AI 设置'),
     h('p', { class: 'cn muted', style: 'margin-top:0' }, me.ai.has_key ? `当前可用：${{ user: '个人 Key', class: '班级 Key', global: '公共 Key' }[me.ai.source] || ''}。` : '不配 Key 也能练习、组卷、模拟考、批改客观题；填写后才解锁主观题 AI 批改、AI 讲解、AI 出题和错题诊断。'),
     h('div', { class: 'field' }, h('label', { class: 'f' }, '服务商'), provSel), fields,

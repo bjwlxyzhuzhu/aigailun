@@ -2,7 +2,7 @@ import { h, GET, POST, PUT, PATCH, DEL, qs, toast, fail, modal, confirmBox, mete
 
 const typeName = TYPE;
 export function tnav(active, role) {
-  const items = [['/t', '班级总览'], ['/t/import', '导入学生'], ['/t/questions', '题库管理'], ['/t/analysis', '题目分析'], ['/t/exams', '班级模拟考试']];
+  const items = [['/t', '班级总览'], ['/t/import', '导入学生'], ['/t/questions', '题库管理'], ['/t/analysis', '题目分析']];
   if (role === 'admin') items.push(['/a', '管理后台']);
   return h('div', { class: 'nav-tabs' }, items.map(([p, l]) => h('a', { href: '#' + p, class: active === p ? 'on' : '' }, l)));
 }
@@ -249,60 +249,4 @@ export async function analysisPage(query, ctx) {
         h('td', { class: 'cn', style: 'font-size:13px' }, r.type === 'single' ? [].concat(r.options.map((o) => `${o.key}:${r.dist[o.key] || 0}${[].concat(r.answer).includes(o.key) ? '✓' : ''}`)).join('　') : r.type === 'tf' ? `√:${r.dist['√'] || 0}　×:${r.dist['×'] || 0}　答案 ${r.answer ? '√' : '×'}` : `参考：${(r.answer || []).map((a) => a.join('/')).join('；')}`)))))) : h('div', { class: 'card cn' }, '作答样本还不够（每题至少 3 人次）。'));
   }
   await load();
-}
-
-/* ---------- class mock exams ---------- */
-export async function examsPage(query, ctx) {
-  const main = ctx.shell({ back: '#/t', backLabel: '后台首页', wide: true });
-  head(main, ctx, '/t/exams', '班级模拟考试', '考前统一演练：选班级、设时间窗，统一卷或每人一卷；成绩只作练习参考。');
-  const [list, cls] = await Promise.all([GET('/teacher/exams'), GET('/teacher/classes')]);
-  const st = { upcoming: ['warn', '未开始'], open: ['ok', '进行中'], closed: ['', '已结束'] };
-  main.append(h('div', { class: 'row', style: 'margin-bottom:16px' }, h('button', { class: 'btn pri', onclick: createModal }, '发布班级模拟考试'),
-    h('button', { class: 'btn', onclick: async () => { try { const r = await POST('/teacher/papers/standard'); openHtml(`/papers/${r.paper_id}/print`); } catch (e) { fail(e); } } }, '生成并打印一张标准卷（纸质练习）')),
-    list.length ? h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['考试', '班级', '时间窗', '时长', '试卷', '参加/交卷/总数', '状态', ''].map((x) => h('th', {}, x)))),
-      h('tbody', {}, list.map((e) => h('tr', {}, h('td', { class: 'cn' }, e.title), h('td', { class: 'cn' }, e.classes.join('、')), h('td', {}, `${fmtFull(e.start_at)} ～ ${fmtFull(e.end_at)}`), h('td', {}, `${e.duration_min}'`), h('td', {}, e.policy === 'unified' ? '统一卷' : '每人一卷'), h('td', {}, `${e.entered} / ${e.done} / ${e.total}`), h('td', {}, h('span', { class: 'tag ' + st[e.state][0] }, st[e.state][1])),
-        h('td', { style: 'white-space:nowrap' }, h('a', { class: 'btn sm pri', href: `#/t/exam/${e.id}` }, '统计'), ' ', e.paper_id ? h('button', { class: 'btn sm', onclick: () => openHtml(`/papers/${e.paper_id}/print`) }, '打印') : null, ' ',
-          h('button', { class: 'btn sm danger', onclick: async () => { if (await confirmBox('删除/取消考试', '已有作答记录的考试将被标记为取消。', { danger: true, ok: '确定' })) { await DEL(`/teacher/exams/${e.id}`); examsPage(query, ctx); } } }, '删除'))))))) : h('div', { class: 'card cn' }, '还没有发布过考试。'));
-  function createModal() {
-    if (!cls.length) return toast('请先导入学生/创建班级');
-    const now = new Date(); now.setMinutes(0, 0, 0);
-    const title = h('input', { class: 'in', value: '期末考前模拟演练' });
-    const start = h('input', { class: 'in', type: 'datetime-local', value: toLocalInput(Date.now() + 3600e3) }), end = h('input', { class: 'in', type: 'datetime-local', value: toLocalInput(Date.now() + 3600e3 * 24 * 3) });
-    const dur = h('input', { class: 'in', type: 'number', value: 90, min: 10, max: 180 }), tries = h('input', { class: 'in', type: 'number', value: 1, min: 1, max: 10 });
-    const pol = h('select', { class: 'in' }, h('option', { value: 'unified' }, '统一卷（全班同一张）'), h('option', { value: 'per_student' }, '每人一卷（随机抽题）'));
-    const picks = cls.map((c) => ({ c, b: h('input', { type: 'checkbox', checked: true }) }));
-    const m = modal(h('div', {}, h('h2', {}, '发布班级模拟考试'),
-      h('div', { class: 'field' }, h('label', { class: 'f' }, '名称'), title),
-      h('div', { class: 'field' }, h('label', { class: 'f' }, '班级'), picks.map((p) => h('label', { class: 'chk' }, p.b, p.c.name))),
-      h('div', { class: 'grid2' }, h('div', { class: 'field' }, h('label', { class: 'f' }, '开放开始'), start), h('div', { class: 'field' }, h('label', { class: 'f' }, '开放截止'), end)),
-      h('div', { class: 'grid3' }, h('div', { class: 'field' }, h('label', { class: 'f' }, '时长（分钟）'), dur), h('div', { class: 'field' }, h('label', { class: 'f' }, '可作答次数'), tries), h('div', { class: 'field' }, h('label', { class: 'f' }, '试卷方式'), pol)),
-      h('p', { class: 'hint' }, '试卷结构固定为 50 单选 + 10 填空 + 10 判断 + 3 综合分析 = 100 分。主观题优先用班级 Key 批改，未配则学生自评。'),
-      h('div', { class: 'row', style: 'justify-content:flex-end' }, h('button', { class: 'btn pri', onclick: async () => {
-        try { await POST('/teacher/exams', { title: title.value, class_ids: picks.filter((p) => p.b.checked).map((p) => p.c.id), start_at: new Date(start.value).getTime(), end_at: new Date(end.value).getTime(), duration_min: +dur.value, max_attempts: +tries.value, paper_policy: pol.value }); toast('已发布'); m.close(); examsPage(query, ctx); } catch (e) { fail(e); }
-      } }, '发布'))), { wide: true });
-  }
-}
-
-export async function examDetailPage(id, query, ctx) {
-  const main = ctx.shell({ back: '#/t/exams', backLabel: '考试列表', wide: true });
-  const d = await GET(`/teacher/exams/${id}/stats`);
-  head(main, ctx, '/t/exams', d.exam.title, `${fmtFull(d.exam.start_at)} ～ ${fmtFull(d.exam.end_at)} · ${d.exam.duration_min} 分钟 · ${d.exam.policy === 'unified' ? '统一卷' : '每人一卷'}`);
-  const mx = Math.max(1, ...d.buckets.map((b) => b.n));
-  main.append(
-    h('div', { class: 'row', style: 'margin-bottom:16px' }, h('button', { class: 'btn pri', onclick: () => download(`/teacher/exams/${id}/export`, `${d.exam.title}-成绩表.csv`) }, '导出成绩表 (Excel/CSV)'),
-      h('button', { class: 'btn', onclick: async () => { try { const r = await POST(`/teacher/exams/${id}/regrade`); toast(`已重新排队批改 ${r.queued} 份`); } catch (e) { fail(e); } } }, '批改未评分主观题'),
-      d.exam.paper_id ? h('button', { class: 'btn', onclick: () => openHtml(`/papers/${d.exam.paper_id}/print`) }, '打印试卷') : null),
-    h('div', { class: 'grid4' }, [['应考', d.total], ['已进入', d.entered], ['已交卷', d.done], ['平均分', dash(d.avg)]].map(([l, v]) => h('div', { class: 'card' }, h('div', { class: 'stat' }, String(v)), h('div', { class: 'lbl muted', style: 'margin-top:6px' }, l)))),
-    h('div', { class: 'grid2', style: 'margin:20px 0;align-items:start' },
-      h('div', { class: 'card' }, h('h3', {}, '分数分布'), d.buckets.map((b) => h('div', { style: 'margin:10px 0' }, h('div', { class: 'row' }, h('span', { class: 'grow' }, b.label), h('b', {}, `${b.n} 人`)), meter((100 * b.n) / mx)))),
-      h('div', { class: 'card' }, h('h3', {}, '正确率最低的题（客观题）'), d.low_questions.length ? d.low_questions.slice(0, 8).map((q) => h('p', { class: 'cn', style: 'font-size:13px;margin:6px 0' }, h('b', { style: 'color:var(--bad)' }, `${q.rate}%　`), `[第${q.c}章·${typeName[q.type]}] ${q.stem.slice(0, 44)}`)) : h('p', { class: 'hint' }, '暂无已交卷数据'),
-        d.essay.length ? h('p', { class: 'hint' }, '综合题均分：' + d.essay.map((e) => `第${e.c}章 ${e.rate}`).join('；')) : null)),
-    h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['班级', '学号', '姓名', '状态', '客观', '主观', '总分', '主观题批改', ''].map((x) => h('th', {}, x)))),
-      h('tbody', {}, d.rows.map((r) => h('tr', {}, h('td', {}, r.class_name), h('td', {}, r.student_no), h('td', {}, r.name),
-        h('td', {}, h('span', { class: 'tag ' + (r.status === 'submitted' ? 'ok' : r.status === 'doing' ? 'blue' : '') }, { submitted: '已交卷', doing: '作答中', none: '未参加' }[r.status])),
-        h('td', { class: 'num' }, dash(r.status === 'submitted' ? r.obj : null)), h('td', { class: 'num' }, dash(r.status === 'submitted' ? r.sub : null)), h('td', { class: 'num' }, h('b', {}, dash(r.total))),
-        h('td', {}, r.status === 'submitted' ? ({ pending: 'AI 批改中', done: 'AI 已批', manual: '待自评', error: '失败', none: '—' }[r.grading] || '—') : '—'),
-        h('td', { style: 'white-space:nowrap' }, r.attempt_id && r.status === 'submitted' ? h('button', { class: 'btn sm', onclick: () => attemptModal(r.attempt_id) }, '答卷/改分') : null, ' ',
-          r.status !== 'none' ? h('button', { class: 'btn sm', onclick: async () => { await POST(`/teacher/exams/${id}/reopen`, { user_id: r.id }); toast(`已允许 ${r.name} 再答一次`); } }, '重开') : null)))))));
-  barGrow(main);
 }

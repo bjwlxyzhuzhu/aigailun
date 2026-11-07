@@ -73,7 +73,6 @@ add(/^\/practice\/setup$/, page('practice', 'setupPage'));
 add(/^\/practice\/(\d+)$/, page('practice', 'runPage'));
 add(/^\/wizard$/, page('exam', 'wizardPage'));
 add(/^\/papers$/, page('exam', 'papersPage'));
-add(/^\/exams$/, page('exam', 'examsPage'));
 add(/^\/exam\/(\d+)$/, page('exam', 'examRunPage'));
 add(/^\/report\/(\d+)$/, page('exam', 'reportPage'));
 add(/^\/wrong$/, page('wrong', 'wrongPage'));
@@ -84,8 +83,6 @@ add(/^\/t\/class\/(\d+)$/, page('teacher', 'classPage'));
 add(/^\/t\/import$/, page('teacher', 'importPage'));
 add(/^\/t\/questions$/, page('teacher', 'questionsPage'));
 add(/^\/t\/analysis$/, page('teacher', 'analysisPage'));
-add(/^\/t\/exams$/, page('teacher', 'examsPage'));
-add(/^\/t\/exam\/(\d+)$/, page('teacher', 'examDetailPage'));
 add(/^\/a$/, page('admin', 'adminPage'));
 add(/^\/a\/(teachers|ai|kb|usage|audit)$/, page('admin', 'adminPage'));
 

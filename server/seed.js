@@ -71,19 +71,25 @@ export function seed() {
     const k = path.join(SEED_DIR, 'kb.json');
     if (fs.existsSync(k)) tx(() => JSON.parse(fs.readFileSync(k, 'utf8')).forEach((r) => q.run('INSERT INTO kb_chunks(chapter_id,slide_no,text) VALUES(?,?,?)', r.c, r.s, r.t)));
   }
+  // extra knowledge: 课后习题 (题干+答案+解析) and 第9章 智能体框架WorkBuddy 第2版 (built by tools/build_kb_extra.py)
+  if (!q.get("SELECT 1 x FROM kb_chunks WHERE src<>'slide' LIMIT 1")) {
+    const k = path.join(SEED_DIR, 'kb_extra.json');
+    if (fs.existsSync(k)) tx(() => JSON.parse(fs.readFileSync(k, 'utf8')).forEach((r) => q.run('INSERT INTO kb_chunks(chapter_id,slide_no,text,src) VALUES(?,?,?,?)', r.c, r.s, r.t, r.x)));
+  }
   // model prices (editable by admin; defaults follow PRD 5.3)
   if (!q.get('SELECT 1 x FROM model_prices LIMIT 1')) {
     const now = Date.now();
     for (const r of [['deepseek', 'deepseek-flash', 0.30, 1.20], ['deepseek', 'deepseek-v4-pro', 1.05, 4.20], ['tokenone', 'default', 0.30, 1.20], ['mock', 'demo', 0, 0]])
       q.run('INSERT INTO model_prices VALUES(?,?,?,?,?,?,?)', r[0], r[1], r[2], r[3], 'USD', 7.1, now);
   }
+  q.run("DELETE FROM api_keys WHERE scope='global'"); // admin-managed keys were removed
   // accounts
   if (!q.get("SELECT 1 x FROM users WHERE role='admin'")) {
     q.run('INSERT INTO users(role,username,name,password_hash,must_change_pwd,created_at) VALUES(?,?,?,?,?,?)',
       'admin', 'admin', '系统管理员', hashPassword(process.env.ADMIN_PASSWORD || 'Admin@2026'), 1, Date.now());
     console.log('[init] 管理员账号 admin / ' + (process.env.ADMIN_PASSWORD || 'Admin@2026') + '（首次登录需改密）');
   }
-  const defaults = { default_password_digits: 6, allow_global_key_for_students: false, global_daily_limit_cny: 1, final_exam_date: '', rewrite_enabled: false, college_default: '机械工程学院' };
+  const defaults = { default_password_digits: 6, final_exam_date: '', rewrite_enabled: false, college_default: '机械工程学院' };
   for (const [k, v] of Object.entries(defaults)) if (getSetting(k) === null) setSetting(k, v);
 }
 

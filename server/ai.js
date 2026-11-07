@@ -4,7 +4,7 @@ import { decrypt } from './lib.js';
 
 export const PROVIDERS = {
   deepseek: { label: 'DeepSeek 官方', base: 'https://api.deepseek.com', models: ['deepseek-flash', 'deepseek-v4-pro'] },
-  tokenone: { label: '中转站 tokenone.work', base: '', models: [] },
+  tokenone: { label: '中转站 tokenone（token.agentone.work）', base: 'https://token.agentone.work/v1', models: ['deepseek-v4.1-flash', 'deepseek-chat'] },
   mock: { label: '演示模式（不联网，仅用于演示流程）', base: 'mock://', models: ['demo'] },
 };
 export class AIError extends Error { constructor(msg, code = 'ai_error', status = 502) { super(msg); this.code = code; this.status = status; } }
@@ -23,17 +23,11 @@ export function costCNY(provider, model, inTok, outTok) {
 }
 const spentToday = (where, ...a) => q.get(`SELECT COALESCE(SUM(actual_cost),0) s FROM ai_usage WHERE created_at>=? AND ${where}`, startOfDay(), ...a).s;
 
-/** Order: personal key -> (class key for class exams) -> global key (if allowed). */
+/** Order: personal key -> class key (set by the teacher). No admin/global key: students bring their own. */
 export function resolveKey(user, { classId = null, preferClass = false } = {}) {
-  const cands = [];
   const own = q.get("SELECT * FROM api_keys WHERE scope='user' AND owner_id=? AND enabled=1", user.id);
   const cls = classId ? q.get("SELECT * FROM api_keys WHERE scope='class' AND owner_id=? AND enabled=1", classId) : null;
-  const glob = q.get("SELECT * FROM api_keys WHERE scope='global' AND enabled=1");
-  if (preferClass && cls) cands.push(cls);
-  if (own) cands.push(own);
-  if (cls && !preferClass) cands.push(cls);
-  if (glob && (user.role !== 'student' || getSetting('allow_global_key_for_students', false) || preferClass)) cands.push(glob);
-  return cands[0] || null;
+  return (preferClass ? cls || own : own || cls) || null;
 }
 export function keyPlain(k) { return k.provider === 'mock' ? 'mock' : decrypt(k.key_cipher, KEY_SECRET); }
 export function keyBrief(k) { return k ? { id: k.id, scope: k.scope, provider: k.provider, model: k.model, last4: k.key_last4 } : null; }
@@ -74,10 +68,6 @@ function mockReply(kind, messages) {
 export async function chat(key, messages, { feature = 'explain', maxTokens = 1200, temperature = 0.3, userId = null, estCost = 0, kind = null } = {}) {
   // daily limits
   if (key.daily_limit_cny > 0 && spentToday('key_id=?', key.id) >= key.daily_limit_cny) throw new AIError('该 Key 今日花费已达上限', 'limit', 429);
-  if (key.scope === 'global' && userId) {
-    const lim = +getSetting('global_daily_limit_cny', 1);
-    if (lim > 0 && spentToday('key_id=? AND user_id=?', key.id, userId) >= lim) throw new AIError('今日公共额度已用完，请填写个人 Key', 'limit', 429);
-  }
   await slot();
   try {
     let text, usage;
@@ -129,13 +119,14 @@ const jsonOf = (t) => { const a = t.indexOf('{'), b = t.lastIndexOf('}'); const 
 
 /* ---------- knowledge base ---------- */
 export function kbContext(chapter, text, limit = 3) {
-  const rows = q.all('SELECT slide_no, text FROM kb_chunks WHERE chapter_id=? LIMIT 3000', chapter);
+  const rows = q.all('SELECT slide_no, text, src FROM kb_chunks WHERE chapter_id=? LIMIT 3000', chapter);
   if (!rows.length) return '';
   const grams = (s) => { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2)); return set; };
   const g = grams(text);
   const top = rows.map((r) => { let n = 0; for (const x of grams(r.text)) if (g.has(x)) n++; return { ...r, n }; })
     .sort((a, b) => b.n - a.n).slice(0, limit).filter((r) => r.n > 2);
-  return top.map((r) => `[课件第${r.slide_no}页] ${r.text.slice(0, 300)}`).join('\n');
+  const tag = (r) => (r.src === 'exercise' ? '课后习题' : r.src === 'wb9' ? `第9章 WorkBuddy（第2版）第${r.slide_no}页` : `课件第${r.slide_no}页`);
+  return top.map((r) => `[${tag(r)}] ${r.text.slice(0, 300)}`).join('\n');
 }
 
 /* ---------- essay grading ---------- */

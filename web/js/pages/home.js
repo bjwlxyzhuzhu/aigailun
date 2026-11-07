@@ -24,7 +24,6 @@ export async function homePage(query, ctx) {
         } else if (a === 'standard') go('#/wizard');
         else if (a === 'custom') go('#/wizard?tab=custom');
         else if (a === 'papers') go('#/papers');
-        else if (a === 'exams') go('#/exams');
         else if (a === 'wrong') go('#/wrong');
         else if (a === 'wrong-practice') {
           const r = await POST('/wrong-book/practice', { filter: {} });

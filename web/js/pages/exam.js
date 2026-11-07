@@ -25,16 +25,19 @@ export async function wizardPage(query, ctx) {
       h('h3', {}, `${res.title} · 预览`),
       h('div', { class: 'grid4' },
         ['single', 'fill', 'tf', 'essay'].filter((t) => res.summary[t]).map((t) => h('div', {}, h('div', { class: 'stat' }, `${res.summary[t].n}`, h('small', {}, t === 'fill' ? '题' : '题')), h('div', { class: 'lbl muted', style: 'margin-top:6px' }, `${TYPE[t]} · ${res.summary[t].points} 分`))),
-        h('div', {}, h('div', { class: 'stat cobalt' }, `${res.total}`, h('small', {}, '分')), h('div', { class: 'lbl muted', style: 'margin-top:6px' }, '总分 · 90 分钟'))),
+        h('div', {}, h('div', { class: 'stat cobalt' }, `${res.total}`, h('small', {}, '分')), h('div', { class: 'lbl muted', style: 'margin-top:6px' }, `总分 · ${res.duration_min || 90} 分钟`))),
       h('div', { style: 'margin:20px 0 6px' }, h('span', { class: 'lbl' }, '章节分布（题数）')),
       h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px 18px' }, dist.map(([c, n]) => h('div', { class: 'cn', style: 'font-size:13px' }, `第${c}章 ${n} 题`, meter((100 * n) / mx)))),
       h('div', { class: 'row', style: 'margin-top:22px' },
-        h('button', { class: 'btn pri', onclick: async () => { try { const r = await POST('/attempts', { paper_id: res.paper_id }); location.hash = `#/exam/${r.attempt_id}`; } catch (e) { fail(e); } } }, '开始 90 分钟模拟考'),
+        h('button', { class: 'btn pri', onclick: async () => { try { const r = await POST('/attempts', { paper_id: res.paper_id }); location.hash = `#/exam/${r.attempt_id}`; } catch (e) { fail(e); } } }, `开始 ${res.duration_min || 90} 分钟模拟考`),
         h('button', { class: 'btn', onclick: () => openHtml(`/papers/${res.paper_id}/print`) }, '导出题目卷 + 答案卷（PDF）'),
         h('a', { class: 'btn', href: '#/papers' }, '我的试卷'))));
     barGrow(previewBox);
   }
+  const dur = h('select', { class: 'in', style: 'max-width:160px', 'aria-label': '考试时长' }, [[60, '60 分钟'], [90, '90 分钟（与期末一致）'], [120, '120 分钟'], [150, '150 分钟']].map(([v, l]) => h('option', { value: v, selected: v === 90 }, l)));
+  const durField = () => h('div', { class: 'field' }, h('label', { class: 'f' }, '考试时长（自己设置）'), dur);
   async function gen(payload, btn) {
+    payload = { ...payload, duration_min: +dur.value };
     btn.disabled = true;
     try { showPreview(await POST('/papers/generate', payload)); } catch (e) { fail(e); }
     btn.disabled = false;
@@ -44,10 +47,10 @@ export async function wizardPage(query, ctx) {
     if (tab === 'standard') {
       const b = h('button', { class: 'btn pri', onclick: () => gen({ mode: 'standard' }, b) }, '生成标准卷');
       body.replaceChildren(h('div', { class: 'card' },
-        h('p', { class: 'cn', style: 'margin-top:0' }, '与期末笔试同结构：73 道题、100 分、90 分钟。每次抽题都会打乱题目与选项顺序，同卷不会出现高度相似的两道题。'),
+        h('p', { class: 'cn', style: 'margin-top:0' }, '与期末笔试同结构：73 道题、100 分。时长由你自己设置（默认 90 分钟）。每次抽题都会打乱题目与选项顺序，同卷不会出现高度相似的两道题。'),
         h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['题型', '数量', '每题', '小计', '范围'].map((x) => h('th', {}, x)))),
           h('tbody', {}, [['单选题', '50 道', '1 分', '50', '第 1–11 章'], ['填空题', '10 空', '1 分/空', '10', '第 1–11 章'], ['判断题', '10 道', '1 分', '10', '第 1–11 章'], ['综合分析题', '3 道', '10 分', '30', '第 7–11 章（3 个不同章节）']].map((r) => h('tr', {}, r.map((c) => h('td', {}, c)))))),
-        h('div', { style: 'margin-top:20px' }, b)));
+        durField(), h('div', { style: 'margin-top:20px' }, b)));
     } else if (tab === 'custom') {
       const sel = new Set(), counts = { single: 20, fill: 5, tf: 5, essay: 0 };
       const pills = chapters.map((c) => { const p = h('button', { class: 'pill', type: 'button', 'aria-pressed': 'false', onclick: () => { sel.has(c.id) ? sel.delete(c.id) : sel.add(c.id); p.setAttribute('aria-pressed', sel.has(c.id)); } }, `第${c.id}章 ${c.title}`); return p; });
@@ -57,7 +60,7 @@ export async function wizardPage(query, ctx) {
       body.replaceChildren(h('div', { class: 'card' },
         h('div', { class: 'field' }, h('label', { class: 'f' }, '章节（不选＝全部）'), h('div', { class: 'pills' }, pills)),
         h('div', { class: 'grid4 field' }, num('single', '单选题（道）', 80, '每题 1 分'), num('fill', '填空题（空）', 30, '每空 1 分'), num('tf', '判断题（道）', 40, '每题 1 分'), num('essay', '综合分析（道）', 5, '每题 10 分，仅第 7–11 章')),
-        h('div', { class: 'field' }, h('label', { class: 'f' }, '偏好'), prefer), b));
+        h('div', { class: 'field' }, h('label', { class: 'f' }, '偏好'), prefer), durField(), b));
     } else {
       const ch = h('select', { class: 'in', style: 'max-width:280px' }, chapters.map((c) => h('option', { value: c.id }, `第${c.id}章 ${c.title}`)));
       const ty = h('select', { class: 'in', style: 'max-width:200px' }, [['single', '单选题'], ['tf', '判断题'], ['fill', '填空题']].map(([k, l]) => h('option', { value: k }, l)));

@@ -1,6 +1,6 @@
 import { h, GET, POST, PUT, PATCH, DEL, toast, fail, modal, confirmBox, riseIn, yuan, fmtDate, fmtFull, fileToB64 } from '../ui.js';
 
-const SECTIONS = [['teachers', '教师账号'], ['ai', '全局 Key · 模型 · 价格 · 设置'], ['kb', '知识库（PPT）'], ['usage', 'AI 用量'], ['audit', '操作日志']];
+const SECTIONS = [['teachers', '教师账号'], ['ai', '模型价格 · 平台设置'], ['kb', '知识库（PPT）'], ['usage', 'AI 用量'], ['audit', '操作日志']];
 const dash = (v) => (v == null ? '—' : v);
 
 export async function adminPage(...args) {
@@ -17,7 +17,7 @@ export async function adminPage(...args) {
 
 async function teachers(box) {
   const list = await GET('/admin/teachers');
-  const reveal = (title, pw) => modal(h('div', {}, h('h2', {}, title), h('p', { class: 'cn' }, '初始密码仅显示这一次，请告知教师（首次登录需修改）：'), h('div', { class: 'ai-box', style: 'font:600 22px var(--sans);letter-spacing:.08em;user-select:all' }, pw)));
+  const reveal = (title, pw) => modal(h('div', {}, h('h2', {}, title), h('p', { class: 'cn' }, '教师默认密码为 123456，请告知教师登录后自行修改（首次登录强制修改）：'), h('div', { class: 'ai-box', style: 'font:600 22px var(--sans);letter-spacing:.08em;user-select:all' }, pw)));
   const u = h('input', { class: 'in', placeholder: '工号', style: 'max-width:180px' }), n = h('input', { class: 'in', placeholder: '姓名', style: 'max-width:180px' });
   box.append(h('div', { class: 'card', style: 'margin-bottom:20px' }, h('h3', {}, '新增教师'), h('div', { class: 'row' }, u, n, h('button', { class: 'btn pri', onclick: async () => { try { const r = await POST('/admin/teachers', { username: u.value, name: n.value }); reveal('教师账号已创建', r.initial_password); u.value = n.value = ''; box.replaceChildren(); teachers(box); } catch (e) { fail(e); } } }, '创建'))),
     h('div', { class: 'tablewrap' }, h('table', { class: 'tbl' }, h('thead', {}, h('tr', {}, ['工号', '姓名', '班级数', '状态', '最近登录', ''].map((x) => h('th', {}, x)))),
@@ -28,31 +28,11 @@ async function teachers(box) {
 }
 
 async function ai(box) {
-  const [gk, settings, prices, info] = await Promise.all([GET('/admin/global-key'), GET('/admin/settings'), GET('/admin/prices'), GET('/me/api-key')]);
-  const key = gk.key;
-  let provider = key?.provider || 'deepseek';
-  const sel = h('select', { class: 'in', onchange: () => { provider = sel.value; draw(); } }, info.providers.map((p) => h('option', { value: p.id, selected: p.id === provider }, p.label)));
-  const f = h('div', {});
-  let base, model, k;
-  const limit = h('input', { class: 'in', type: 'number', min: 0, step: 1, value: key?.daily_limit_cny || 0, style: 'max-width:160px' });
-  const draw = () => {
-    const P = info.providers.find((p) => p.id === provider);
-    base = h('input', { class: 'in', value: key?.provider === provider ? key.base_url : P.base });
-    model = P.models.length ? h('select', { class: 'in' }, P.models.map((x) => h('option', { value: x, selected: key?.model === x }, x))) : h('input', { class: 'in', value: key?.model || '', placeholder: '模型名（待确认）' });
-    k = h('input', { class: 'in', type: 'password', autocomplete: 'off', placeholder: key && key.provider === provider ? `已保存 ${key.masked}（留空不修改）` : 'sk-…' });
-    f.replaceChildren(provider === 'tokenone' ? h('div', { class: 'field' }, h('label', { class: 'f' }, '接口地址（待确认）'), base) : null, provider !== 'mock' ? h('div', { class: 'field' }, h('label', { class: 'f' }, '模型'), model) : null, provider !== 'mock' ? h('div', { class: 'field' }, h('label', { class: 'f' }, 'API Key'), k) : null);
-  };
-  draw();
-  const gcard = h('div', { class: 'card' }, h('h3', {}, '全局 Key'), h('p', { class: 'cn muted', style: 'margin-top:0' }, '最低优先级：学生个人 Key → 班级 Key → 全局 Key。是否允许学生练习使用全局 Key 见右侧设置。'),
-    h('div', { class: 'field' }, h('label', { class: 'f' }, '服务商'), sel), f, h('div', { class: 'field' }, h('label', { class: 'f' }, '全局 Key 每日花费上限（元，0＝不限）'), limit),
-    h('div', { class: 'row' },
-      h('button', { class: 'btn pri', onclick: async () => { try { await PUT('/admin/global-key', { provider, base_url: base.value, model: model.value, key: k?.value || '', daily_limit_cny: +limit.value || 0 }); toast('已保存'); location.reload(); } catch (e) { fail(e); } } }, '保存'),
-      key ? h('button', { class: 'btn', onclick: async (e) => { e.currentTarget.disabled = true; try { const r = await POST('/admin/global-key/test'); toast(`连接成功（${r.usage.input_tokens + r.usage.output_tokens} tokens）`); } catch (x) { fail(x); } e.currentTarget.disabled = false; } }, '测试连接') : null,
-      key ? h('button', { class: 'btn danger', onclick: async () => { await DEL('/admin/global-key'); location.reload(); } }, '删除') : null));
+  const [settings, prices] = await Promise.all([GET('/admin/settings'), GET('/admin/prices')]);
   const S = {};
   const inp = (kk, label, type = 'text', hint) => { const i = h('input', { class: 'in', type: type === 'bool' ? 'checkbox' : type, value: settings[kk], checked: type === 'bool' ? !!settings[kk] : undefined, style: type === 'bool' ? '' : 'max-width:240px' }); S[kk] = { i, type }; return h('div', { class: 'field' }, type === 'bool' ? h('label', { class: 'chk' }, i, label) : [h('label', { class: 'f' }, label), i], hint ? h('p', { class: 'hint' }, hint) : null); };
   const scard = h('div', { class: 'card' }, h('h3', {}, '平台设置'),
-    inp('final_exam_date', '期末笔试日期（书架首页倒计时）', 'date', '日期待确认，留空则不显示倒计时。'), inp('allow_global_key_for_students', '允许学生练习使用全局 Key', 'bool'), inp('global_daily_limit_cny', '全局 Key 每人每日限额（元）', 'number'),
+    inp('final_exam_date', '期末笔试日期（书架首页倒计时）', 'date', '日期待确认，留空则不显示倒计时。'),
     inp('default_password_digits', '初始密码取学号后几位', 'number'), inp('college_default', '导入时默认学院'), inp('semester', '学期标识'), inp('ai_concurrency', 'AI 批改并发上限', 'number'),
     h('button', { class: 'btn pri', onclick: async () => { const b = {}; for (const [kk, { i, type }] of Object.entries(S)) b[kk] = type === 'bool' ? i.checked : type === 'number' ? +i.value : i.value; try { await PUT('/admin/settings', b); toast('设置已保存'); } catch (e) { fail(e); } } }, '保存设置'));
   const rows = prices.map((p) => ({ ...p }));
@@ -62,7 +42,7 @@ async function ai(box) {
       h('tbody', {}, rows.map((p) => h('tr', {}, h('td', {}, p.provider), h('td', {}, p.model), h('td', {}, num(p, 'input_per_m')), h('td', {}, num(p, 'output_per_m')),
         h('td', {}, h('select', { class: 'in', style: 'min-height:32px;padding:4px 8px', onchange: (e) => (p.currency = e.target.value) }, ['USD', 'CNY'].map((c) => h('option', { value: c, selected: p.currency === c }, c)))), h('td', {}, num(p, 'fx_rate'))))))),
     h('div', { style: 'margin-top:12px' }, h('button', { class: 'btn pri', onclick: async () => { try { await PUT('/admin/prices', { prices: rows }); toast('价格已保存'); } catch (e) { fail(e); } } }, '保存价格')));
-  box.append(h('div', { class: 'grid2', style: 'align-items:start' }, gcard, scard, pcard));
+  box.append(h('div', { class: 'grid2', style: 'align-items:start' }, scard, pcard));
 }
 
 async function kb(box) {
