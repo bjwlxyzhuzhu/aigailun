@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 474 900" width="474" height="900">
+<rect width="474" height="900" fill="#DCD6E6"/>
+<rect x="0" y="0" width="474" height="900" fill="none" stroke="#1E1630" stroke-opacity=".25" stroke-width="2"/>
+<text x="28" y="48" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="15" letter-spacing="3" fill="#1E1630">№ 09 / 13</text>
+<text x="446" y="48" text-anchor="end" font-family="'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif" font-size="15" letter-spacing="2" fill="#1E1630">人工智能概论</text>
+<line x1="28" y1="64" x2="446" y2="64" stroke="#1E1630" stroke-opacity=".5"/>
+<g transform="translate(0 100)"><g fill="none" stroke="#1E1630" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"><path d="M110 460 V400 L210 300 L330 330 L390 150"/></g><g fill="#C8452C"><circle cx="110" cy="400" r="24"/><circle cx="210" cy="300" r="24"/><circle cx="330" cy="330" r="24"/></g><path d="M368 118 L412 118 L390 74 Z M366 150 L346 100 M414 150 L434 100" fill="none" stroke="#1E1630" stroke-width="10" stroke-linecap="round"/><rect x="50" y="456" width="150" height="26" fill="#1E1630"/></g>
+<rect x="28" y="640" width="64" height="8" fill="#C8452C"/>
+<text x="28" y="716" font-family="'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif" font-size="62" font-weight="700" fill="#1E1630">具身智能</text>
+<text x="28" y="760" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="15" letter-spacing="4" fill="#1E1630" opacity=".8">EMBODIED AI</text>
+<line x1="28" y1="810" x2="446" y2="810" stroke="#1E1630" stroke-opacity=".5"/>
+<text x="28" y="842" font-family="'Noto Serif SC','Source Han Serif SC','Songti SC','STSong','SimSun',serif" font-size="16" letter-spacing="3" fill="#1E1630" opacity=".85">智能练考平台 · 期末备考</text>
+<text x="446" y="842" text-anchor="end" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="13" letter-spacing="2" fill="#1E1630" opacity=".6">VHS 09</text>
+<rect x="28" y="862" width="418" height="10" fill="#C8452C" opacity=".9"/>
+</svg>

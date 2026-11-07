@@ -1,0 +1,6 @@
+data/app.db*
+data/.jwt_secret
+data/.key_secret
+node_modules/
+*.log
+.claude/

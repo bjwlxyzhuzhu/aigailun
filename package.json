@@ -1,0 +1,15 @@
+{
+  "name": "ai-exam-platform",
+  "version": "0.1.0",
+  "description": "《人工智能概论》智能练考平台",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.5" },
+  "scripts": {
+    "start": "node --no-warnings server/index.js",
+    "dev": "node --no-warnings --watch server/index.js",
+    "import-questions": "python -I tools/import_questions.py <docx目录> data/questions.json",
+    "test": "node --no-warnings tools/smoke.mjs",
+    "loadtest": "node --no-warnings tools/loadtest.mjs"
+  }
+}
